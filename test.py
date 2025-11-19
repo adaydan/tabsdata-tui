@@ -70,3 +70,8 @@ def pick_instance() -> Optional[str]:
 if __name__ == "__main__":
     value = pick_instance()
     print("Picker returned:", value)
+
+
+git remote remove origin
+git remote add origin https://github.com/adaydan/tabsdata-tui.git
+
