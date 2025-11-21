@@ -1,0 +1,16 @@
+from textual.app import App, ComposeResult
+from textual.screen import Screen
+from textual.widgets import ListView, ListItem, Label
+from pathlib import Path
+import logging
+
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.widgets import Footer
+
+def process_response(screen: Screen, label):
+    app = screen.app
+    screen_name = type(app.screen).__name__
+    if label == "Instance Management":
+        app.push_screen("animal")
+    return

@@ -72,6 +72,4 @@ if __name__ == "__main__":
     print("Picker returned:", value)
 
 
-git remote remove origin
-git remote add origin https://github.com/adaydan/tabsdata-tui.git
 
