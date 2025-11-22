@@ -72,3 +72,17 @@ MainScreen
 MainScreen
 MainScreen
 AnimalScreen
+MainScreen
+AnimalScreen
+MainScreen
+MainScreen
+MainScreen
+MainScreen
+MainScreen
+MainScreen
+{'name': None, 'external_port': 2457, 'internal_port': 2458}
+{'name': 'tabsdata', 'external_port': 2457, 'internal_port': 2458}
+MainScreen
+{'name': 'tabsdata', 'external_port': 2457, 'internal_port': 2458}
+{'name': 'test', 'external_port': 2457, 'internal_port': 2458}
+{'name': 'tabsdata', 'external_port': 2457, 'internal_port': 2458}
