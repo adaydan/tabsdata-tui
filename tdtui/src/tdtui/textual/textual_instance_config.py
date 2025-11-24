@@ -7,9 +7,17 @@ from textual.screen import Screen
 from textual.widgets import Input, Label, Static, Footer
 from textual.containers import Vertical
 from rich.text import Text
+from textual.containers import VerticalScroll
 
 from tdtui.core.find_instances import main as find_instances
+import logging
+from pathlib import Path
 
+logging.basicConfig(
+    filename= Path.home() / "tabsdata-vm" / "log.log",
+    level=logging.INFO,
+    format="%(message)s"
+)
 
 def validate_port(port_str: str) -> bool:
     """Return True if port_str is an integer between 1 and 65535."""
@@ -109,42 +117,58 @@ class PortConfigScreen(Screen):
       app.selected_internal_port
       app.port_selection (dict)
     """
+    CSS = """
+    #portscroll {
+        height: 1fr;
+        overflow: auto;
+    }
+    """
 
     def __init__(self, instance_name: Optional[str] = None) -> None:
         super().__init__()
         # Name of the instance we are configuring; used to skip itself
-        self.instance_name = instance_name 
-        self.selected_instance_name = instance_name
+        if hasattr(self.app, "instance_name"):
+            self.instance_name = self.app.instance_name
+            self.selected_instance_name = instance_name
 
         self.external_port: Optional[int] = None
         self.internal_port: Optional[int] = None
 
     def compose(self) -> ComposeResult:
+        logging.info(self.virtual_size)
         from tdtui.textual.textual_simple import CurrentInstanceWidget
         instance = self.instance_name
         yield CurrentInstanceWidget(instance)
-        yield Vertical(
-            Label("What Would Like to call your Tabsdata Instance:", id="title-instance"),
-            Input(placeholder="tabsdata", id="instance-input"),
-            Label("", id="instance-error"),
-            Label("", id="instance-confirm"), 
-            Label("Configure Tabsdata ports", id="title"),
-            Label("External port:", id="ext-label"),
-            Input(placeholder="2457", id="ext-input"),
-            Label("", id="ext-error"),
-            Label("", id="ext-confirm"),  # "selected ___ port" message
-            Label("Internal port:", id="int-label"),
-            Input(placeholder="2458", id="int-input"),
-            Label("", id="int-error"),
-            Label("", id="int-confirm"),  # final confirm if you want it
-        )
+        self.scrollbar =  VerticalScroll(
+             Vertical(
+                Label("What Would Like to call your Tabsdata Instance:", id="title-instance"),
+                Input(placeholder="tabsdata", id="instance-input"),
+                Label("", id="instance-error"),
+                Label("", id="instance-confirm"), 
+                Label("Configure Tabsdata ports", id="title"),
+                Label("External port:", id="ext-label"),
+                Input(placeholder="2457", id="ext-input"),
+                Label("", id="ext-error"),
+                Label("", id="ext-confirm"),  # "selected ___ port" message
+                Label("Internal port:", id="int-label"),
+                Input(placeholder="2458", id="int-input"),
+                Label("", id="int-error"),
+                Label("", id="int-confirm"),  # final confirm if you want it
+            ), 
+            id="portscroll",
+            )
+        logging.info(self.virtual_size)
+        yield self.scrollbar
+        logging.info(self.virtual_size)
         yield Footer()
+        logging.info(self.virtual_size)
 
     def on_mount(self) -> None:
+        logging.info(self.virtual_size)
         # Start with focus on external port
         if self.instance_name is not None:
             self.query_one("#instance-confirm", Label).display = False
-            self.query_one("#instance-error", Input).display = False
+            self.query_one("#instance-error", Label).display = False
             self.query_one("#instance-input", Input).display = False
             self.query_one("#title-instance", Label).display = False
             self.set_focus(self.query_one("#ext-input", Input))
@@ -156,21 +180,25 @@ class PortConfigScreen(Screen):
             self.query_one("#title", Label).display = False
             self.set_focus(self.query_one("#instance-input", Input))
 
-        
+        logging.info(self.virtual_size)
         self.query_one("#int-label", Label).display = False
         self.query_one("#int-input", Input).display = False
         self.query_one("#int-error", Label).display = False
         self.query_one("#int-confirm", Label).display = False
+        logging.info(self.virtual_size)
 
         
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        logging.info(self.virtual_size)
         if event.input.id == "ext-input":
             self._handle_external_submitted(event.input)
         elif event.input.id == "int-input":
             self._handle_internal_submitted(event.input)
         elif event.input.id == "instance-input":
             self._handle_instance_name_submitted(event.input)
+        self.query_one("#portscroll", VerticalScroll).scroll_end(animate=False)
+        logging.info(self.virtual_size)
 
     # ---------------------------
     # External port flow

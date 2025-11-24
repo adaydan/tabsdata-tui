@@ -12,5 +12,10 @@ def process_response(screen: Screen, label):
     app = screen.app
     screen_name = type(app.screen).__name__
     if label == "Instance Management":
-        app.push_screen("animal")
+        app.push_screen("PortConfig")
+    if label == "Bind An Instance":
+        app.push_screen("InstanceSelection")
+    if screen_name == "InstanceSelectionScreen":
+        app.instance_name = label
+        app.push_screen("PortConfig")
     return
