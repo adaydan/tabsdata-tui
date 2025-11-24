@@ -21,16 +21,22 @@ from textual.widgets import Footer
 
 from tdtui.textual.textual_instance_config import PortConfigScreen
 
+from textual.app import App, ComposeResult
+from textual.screen import Screen
+from textual.containers import Horizontal, VerticalScroll
+from textual.widgets import Static
+
 logging.basicConfig(
-    filename= Path.home() / "tabsdata-vm" / "log.log",
+    filename=Path.home() / "tabsdata-vm" / "log.log",
     level=logging.INFO,
-    format="%(message)s"
+    format="%(message)s",
 )
+
 
 class InstanceWidget(Static):
     """Rich panel showing the current working instance."""
 
-    def __init__(self, inst: Optional[str] = None, inst_name = None):
+    def __init__(self, inst: Optional[str] = None, inst_name=None):
         super().__init__()
         self.inst = inst
         self.inst_name = inst_name
@@ -46,7 +52,9 @@ class InstanceWidget(Static):
         elif inst_name is not None:
             inst = [i for i in find_instances() if i["name"] == inst_name][0]
         elif hasattr(self.app, "instance_name"):
-            inst = [i for i in find_instances() if i["name"] == self.app.instance_name][0]
+            inst = [i for i in find_instances() if i["name"] == self.app.instance_name][
+                0
+            ]
 
         if inst is None:
             status = None
@@ -57,7 +65,6 @@ class InstanceWidget(Static):
             cfg_int = inst.get("cfg_int", None)
             arg_ext = inst.get("arg_ext", None)
             arg_int = inst.get("arg_int", None)
-
 
         if status == "Running":
             status_color = "#22c55e"
@@ -88,19 +95,17 @@ class InstanceWidget(Static):
         # inner instance panel
         instance_panel = self._make_instance_panel()
         return instance_panel
-    
+
+
 class CurrentInstanceWidget(InstanceWidget):
     def render(self) -> RenderableType:
         # inner instance panel
         instance_panel = self._make_instance_panel()
 
-
-        header = Align.center(
-            Text("Current Working Instance:", style="bold #22c55e")
-        )
+        header = Align.center(Text("Current Working Instance:", style="bold #22c55e"))
 
         inner = Group(
-            header,     # spacer
+            header,  # spacer
             Align.center(instance_panel),
         )
 
@@ -110,6 +115,7 @@ class CurrentInstanceWidget(InstanceWidget):
             expand=False,
         )
         return Align.center(outer)
+
 
 class LabelItem(ListItem):
 
@@ -123,9 +129,8 @@ class LabelItem(ListItem):
         if override_label is not None:
             self.label = override_label
 
-    def compose( self ) -> ComposeResult:
+    def compose(self) -> ComposeResult:
         yield self.front
-
 
 
 class ScreenTemplate(Screen):
@@ -137,17 +142,17 @@ class ScreenTemplate(Screen):
 
     def compose(self) -> ComposeResult:
         logging.info(self.app.port_selection)
-        instance = self.app.port_selection.get('name')
+        instance = self.app.port_selection.get("name")
         logging.info(f"instance chosen is {instance} at type {type(instance)}")
         with VerticalScroll():
             if self.header is not None:
-                yield Label(self.header, id = 'listHeader')
+                yield Label(self.header, id="listHeader")
             yield CurrentInstanceWidget(inst_name=instance)
             choiceLabels = [LabelItem(i) for i in self.choices]
             self.list = ListView(*choiceLabels)
             yield self.list
             yield Footer()
-    
+
     def on_show(self) -> None:
         # called again when you push this screen a
         #  second time (if reused)
@@ -156,7 +161,56 @@ class ScreenTemplate(Screen):
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         selected = event.item.label
         logging.info(type(self.screen).__name__)
-        process_response(self, selected)   # push instance
+        process_response(self, selected)  # push instance
+
+
+class OverflowScreen(Screen):
+
+    CSS = """
+    Screen {
+        background: $background;
+        color: black;
+    }
+
+    VerticalScroll {
+        width: 1fr;
+    }
+
+    Static {
+        margin: 1 2;
+        background: green 80%;
+        border: green wide;
+        color: white 90%;
+        height: auto;
+    }
+
+    #right {
+        overflow-y: hidden;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        TEXT = """I must not fear.
+        Fear is the mind-killer.
+        Fear is the little-death that brings total obliteration.
+        I will face my fear.
+        I will permit it to pass over me and through me.
+        And when it has gone past, I will turn the inner eye to see its path.
+        Where the fear has gone there will be nothing. Only I will remain."""
+        yield Horizontal(
+            VerticalScroll(
+                Static(TEXT),
+                Static(TEXT),
+                Static(TEXT),
+                id="left",
+            ),
+            VerticalScroll(
+                Static(TEXT),
+                Static(TEXT),
+                Static(TEXT),
+                id="right",
+            ),
+        )
 
 
 class InstanceSelectionScreen(Screen):
@@ -165,13 +219,16 @@ class InstanceSelectionScreen(Screen):
 
     def compose(self) -> ComposeResult:
         instances = find_instances()
-        instanceWidgets = [LabelItem(label=InstanceWidget(i), override_label=i.get("name")) for i in instances]
+        instanceWidgets = [
+            LabelItem(label=InstanceWidget(i), override_label=i.get("name"))
+            for i in instances
+        ]
         with VerticalScroll():
             # self.list = ListView(*[LabelItem('a'), LabelItem('b')])
             self.list = ListView(*instanceWidgets)
             yield self.list
         yield Footer()
-    
+
     def on_show(self) -> None:
         # called again when you push this screen a
         #  second time (if reused)
@@ -180,8 +237,7 @@ class InstanceSelectionScreen(Screen):
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         selected = event.item.label
         logging.info(type(self.screen).__name__)
-        process_response(self, selected)   # push instance
-
+        process_response(self, selected)  # push instance
 
 
 class MainScreen(ScreenTemplate):
@@ -198,53 +254,55 @@ class MainScreen(ScreenTemplate):
             id="MainScreen",
         )
 
+
 class InstanceManagementScreen(ScreenTemplate):
     def __init__(self):
         super().__init__(
-            choices=[
-                "Start an Instance",
-                "Stop an Instance",
-                "Set Working Instance"
-            ],
+            choices=["Start an Instance", "Stop an Instance", "Set Working Instance"],
             id="InstanceManagementScreen",
         )
+
 
 class GettingStartedScreen(ScreenTemplate):
     def __init__(self):
         super().__init__(
-            choices=[
-                "Bind An Instance",
-                "Help",
-                "Exit"
-            ],
+            choices=["Bind An Instance", "Help", "Exit"],
             id="GettingStartedScreen",
-            header="Welcome to Tabsdata. Select an Option to get started below"
+            header="Welcome to Tabsdata. Select an Option to get started below",
         )
+
 
 class NestedMenuApp(App):
     CSS = """
-    Screen {
-        color: white;
+
+    VerticalScroll {
+        width: 1fr;
+    }
+
+    #right {
+        overflow-y: hidden;
     }
     """
     SCREENS = {
         "main": MainScreen,
         "instancemanagement": InstanceManagementScreen,
-        "PortConfig": PortConfigScreen,
+        "PortConfig": lambda: PortConfigScreen(),
         "GettingStarted": GettingStartedScreen,
-        "InstanceSelection": InstanceSelectionScreen
+        "InstanceSelection": InstanceSelectionScreen,
+        "Overflow": OverflowScreen,
     }
-    BINDINGS = [("ctrl+c", "quit", "Quit"),
-                ("ctrl+b", "go_back", "Go Back"),
-                ("ctrl+d", "scroll_down", "Scroll Down")]
-    
+    BINDINGS = [
+        ("ctrl+c", "quit", "Quit"),
+        ("ctrl+b", "go_back", "Go Back"),
+    ]
+
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)  
+        super().__init__(**kwargs)
         self.port_selection = {
             "name": None,
             "external_port": None,
             "internal_port": None,
-        }      
+        }
 
     def on_mount(self) -> None:
         # start with a MainMenu instance
@@ -252,10 +310,12 @@ class NestedMenuApp(App):
 
     def action_go_back(self):
         logging.info(f"screen is {self.screen.id}")
-        if self.screen.id not in  ["MainScreen", "GettingStartedScreen"]:
+        if self.screen.id not in ["MainScreen", "GettingStartedScreen"]:
             self.pop_screen()
 
-        
+
+def run_app():
+    NestedMenuApp().run()
 
 
 if __name__ == "__main__":
