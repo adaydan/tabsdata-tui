@@ -26,6 +26,8 @@ from textual.screen import Screen
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Static
 
+from tdtui.textual.task_screen import TaskScreen as InstanceStartup
+
 logging.basicConfig(
     filename=Path.home() / "tabsdata-vm" / "log.log",
     level=logging.INFO,
@@ -71,8 +73,9 @@ class InstanceWidget(Static):
             status_line = f"{name}  ● Running"
             line1 = f"running on → ext: {arg_ext}"
             line2 = f"running on → int: {arg_int}"
+            self.app.port_selection["status"] = "Running"
         elif status is None:
-            status_color = "#3522c5"
+            status_color = "#e4e4e6"
             status_line = f"○ No Instance Selected"
             line1 = f"No External Running Port"
             line2 = f"No Internal Running Port"
@@ -83,7 +86,7 @@ class InstanceWidget(Static):
             line2 = f"configured on → int: {cfg_int}"
 
         header = Text(status_line, style=f"bold {status_color}")
-        body = Text(f"{line1}\n{line2}", style="#3522c5")
+        body = Text(f"{line1}\n{line2}", style="#f9f9f9")
 
         return Panel(
             Group(header, body),
@@ -290,6 +293,7 @@ class NestedMenuApp(App):
         "GettingStarted": GettingStartedScreen,
         "InstanceSelection": InstanceSelectionScreen,
         "Overflow": OverflowScreen,
+        "InstanceStartup": lambda: InstanceStartup(),
     }
     BINDINGS = [
         ("ctrl+c", "quit", "Quit"),
@@ -302,6 +306,7 @@ class NestedMenuApp(App):
             "name": None,
             "external_port": None,
             "internal_port": None,
+            "status": "Not Running",
         }
 
     def on_mount(self) -> None:
@@ -309,9 +314,16 @@ class NestedMenuApp(App):
         self.push_screen("GettingStarted")
 
     def action_go_back(self):
-        logging.info(f"screen is {self.screen.id}")
+        logging.info(
+            f'screen is { {k: v for k, v in self.screen.__dict__.items() if "InstanceSelection" in str(v)} }'
+        )
+
         if self.screen.id not in ["MainScreen", "GettingStartedScreen"]:
+            active_screen = self.screen
+            active_screen_class = self.screen.__class__
+            active_screen_name = self.screen.name
             self.pop_screen()
+            self.install_screen(active_screen_class(), active_screen_name)
 
 
 def run_app():

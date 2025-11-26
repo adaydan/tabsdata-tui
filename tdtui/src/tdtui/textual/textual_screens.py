@@ -1,3 +1,33 @@
+from textual.app import App, ComposeResult
+from textual.screen import Screen
+from textual.widgets import ListView, ListItem, Label, Static
+from pathlib import Path
+from tdtui.textual.api_processor import process_response
+from tdtui.core.find_instances import main as find_instances
+import logging
+from typing import Optional, Dict, Any, List
+from textual.containers import VerticalScroll
+
+from textual.widgets import Static
+
+from rich.console import Group, RenderableType
+from rich.panel import Panel
+from rich.text import Text
+from rich.align import Align
+
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.widgets import Footer
+
+from tdtui.textual.textual_instance_config import PortConfigScreen
+
+from textual.app import App, ComposeResult
+from textual.screen import Screen
+from textual.containers import Horizontal, VerticalScroll
+from textual.widgets import Static
+
+from tdtui.textual.task_screen import TaskScreen as InstanceStartup
+
 from __future__ import annotations
 
 from typing import Optional, Dict, Any, List
@@ -13,91 +43,219 @@ import logging
 from pathlib import Path
 from textual import events
 
-
 logging.basicConfig(
-    filename=Path(__file__).resolve().parent / "log.log",
+    filename=Path.home() / "tabsdata-vm" / "log.log",
     level=logging.INFO,
     format="%(message)s",
 )
 
 
-def validate_port(port_str: str) -> bool:
-    """Return True if port_str is an integer between 1 and 65535."""
-    port_str = str(port_str)
-    if not port_str.isdigit():
-        return False
-    port = int(port_str)
-    return 1 <= port <= 65535
+class InstanceWidget(Static):
+    """Rich panel showing the current working instance."""
 
+    def __init__(self, inst: Optional[str] = None, inst_name=None):
+        super().__init__()
+        self.inst = inst
+        self.inst_name = inst_name
 
-def get_running_ports() -> List[Dict[str, Any]]:
-    """
-    Python equivalent of get_running_ports() from bash.
+    def _make_instance_panel(self) -> Panel:
 
-    Returns a list of dicts for running instances, each with:
-      name, status, external_port, internal_port
-    """
-    instances = find_instances()
-    running = []
+        inst = self.inst
+        inst_name = self.inst_name
+        # inst --> inst_name --> app attr
 
-    for inst in instances:
-        status = inst.get("status")
-        if status != "Running":
-            continue
+        if inst is not None and type(inst) == dict:
+            pass
+        elif inst_name is not None:
+            inst = [i for i in find_instances() if i["name"] == inst_name][0]
+        elif hasattr(self.app, "instance_name"):
+            inst = [i for i in find_instances() if i["name"] == self.app.instance_name][
+                0
+            ]
 
-        name = inst.get("name", "?")
-        arg_ext = inst.get("arg_ext") or ""
-        arg_int = inst.get("arg_int") or ""
+        if inst is None:
+            status = None
+        else:
+            name = inst.get("name", None)
+            status = inst.get("status", None)
+            cfg_ext = inst.get("cfg_ext", None)
+            cfg_int = inst.get("cfg_int", None)
+            arg_ext = inst.get("arg_ext", None)
+            arg_int = inst.get("arg_int", None)
 
-        # Extract port from "host:port" or use as-is if just "port"
-        ext_port_str = arg_ext.split(":")[-1] if arg_ext else ""
-        int_port_str = arg_int.split(":")[-1] if arg_int else ""
+        if status == "Running":
+            status_color = "#22c55e"
+            status_line = f"{name}  ● Running"
+            line1 = f"running on → ext: {arg_ext}"
+            line2 = f"running on → int: {arg_int}"
+            self.app.port_selection["status"] = "Running"
+        elif status is None:
+            status_color = "#e4e4e6"
+            status_line = f"○ No Instance Selected"
+            line1 = f"No External Running Port"
+            line2 = f"No Internal Running Port"
+        else:
+            status_color = "#ef4444"
+            status_line = f"{name}  ○ Not running"
+            line1 = f"configured on → ext: {cfg_ext}"
+            line2 = f"configured on → int: {cfg_int}"
 
-        # Only keep if they look like valid ports; otherwise ignore
-        ext_port = int(ext_port_str) if ext_port_str.isdigit() else None
-        int_port = int(int_port_str) if int_port_str.isdigit() else None
+        header = Text(status_line, style=f"bold {status_color}")
+        body = Text(f"{line1}\n{line2}", style="#f9f9f9")
 
-        running.append(
-            {
-                "name": name,
-                "status": status,
-                "external_port": ext_port,
-                "internal_port": int_port,
-            }
+        return Panel(
+            Group(header, body),
+            border_style=status_color,
+            expand=False,
         )
 
-    return running
+    def render(self) -> RenderableType:
+        # inner instance panel
+        instance_panel = self._make_instance_panel()
+        return instance_panel
 
 
-def port_in_use(
-    port: int, current_instance_name: Optional[str] = None
-) -> Optional[str]:
+class CurrentInstanceWidget(InstanceWidget):
+    def render(self) -> RenderableType:
+        # inner instance panel
+        instance_panel = self._make_instance_panel()
+
+        header = Align.center(Text("Current Working Instance:", style="bold #22c55e"))
+
+        inner = Group(
+            header,  # spacer
+            Align.center(instance_panel),
+        )
+
+        outer = Panel(
+            inner,
+            border_style="#0f766e",
+            expand=False,
+        )
+        return Align.center(outer)
+
+
+class LabelItem(ListItem):
+
+    def __init__(self, label: str, override_label=None) -> None:
+        super().__init__()
+        if type(label) == str:
+            self.front = Label(label)
+        else:
+            self.front = label
+        self.label = label
+        if override_label is not None:
+            self.label = override_label
+
+    def compose(self) -> ComposeResult:
+        yield self.front
+
+
+class ScreenTemplate(Screen):
+    def __init__(self, choices=None, id=None, header="Select an Option: "):
+        super().__init__()
+        self.choices = choices
+        self.id = id
+        self.header = header
+
+    def compose(self) -> ComposeResult:
+        logging.info(self.app.port_selection)
+        instance = self.app.port_selection.get("name")
+        logging.info(f"instance chosen is {instance} at type {type(instance)}")
+        with VerticalScroll():
+            if self.header is not None:
+                yield Label(self.header, id="listHeader")
+            yield CurrentInstanceWidget(inst_name=instance)
+            choiceLabels = [LabelItem(i) for i in self.choices]
+            self.list = ListView(*choiceLabels)
+            yield self.list
+            yield Footer()
+
+    def on_show(self) -> None:
+        # called again when you push this screen a
+        #  second time (if reused)
+        self.set_focus(self.list)
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        selected = event.item.label
+        logging.info(type(self.screen).__name__)
+        process_response(self, selected)  # push instance
+
+
+class OverflowScreen(Screen):
+
+    CSS = """
+    Screen {
+        background: $background;
+        color: black;
+    }
+
+    VerticalScroll {
+        width: 1fr;
+    }
+
+    Static {
+        margin: 1 2;
+        background: green 80%;
+        border: green wide;
+        color: white 90%;
+        height: auto;
+    }
+
+    #right {
+        overflow-y: hidden;
+    }
     """
-    Return the instance name using this port, or None if free.
-    """
-    for inst in get_running_ports():
-        name = inst.get("name")
-        if current_instance_name and name == current_instance_name:
-            continue
 
-        ext_port = inst.get("external_port")
-        int_port = inst.get("internal_port")
+    def compose(self) -> ComposeResult:
+        TEXT = """I must not fear.
+        Fear is the mind-killer.
+        Fear is the little-death that brings total obliteration.
+        I will face my fear.
+        I will permit it to pass over me and through me.
+        And when it has gone past, I will turn the inner eye to see its path.
+        Where the fear has gone there will be nothing. Only I will remain."""
+        yield Horizontal(
+            VerticalScroll(
+                Static(TEXT),
+                Static(TEXT),
+                Static(TEXT),
+                id="left",
+            ),
+            VerticalScroll(
+                Static(TEXT),
+                Static(TEXT),
+                Static(TEXT),
+                id="right",
+            ),
+        )
 
-        if ext_port == port or int_port == port:
-            return name
 
-    return None
+class InstanceSelectionScreen(Screen):
+    def __init__(self, id=None):
+        super().__init__()
 
+    def compose(self) -> ComposeResult:
+        instances = find_instances()
+        instanceWidgets = [
+            LabelItem(label=InstanceWidget(i), override_label=i.get("name"))
+            for i in instances
+        ]
+        with VerticalScroll():
+            # self.list = ListView(*[LabelItem('a'), LabelItem('b')])
+            self.list = ListView(*instanceWidgets)
+            yield self.list
+        yield Footer()
 
-def name_in_use(selected_name: str) -> bool:
-    """
-    Return True if an instance already uses this name.
-    """
-    for inst in find_instances():
-        name = inst.get("name")
-        if selected_name == name:
-            return True
-    return False
+    def on_show(self) -> None:
+        # called again when you push this screen a
+        #  second time (if reused)
+        self.set_focus(self.list)
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        selected = event.item.label
+        logging.info(type(self.screen).__name__)
+        process_response(self, selected)  # push instance
 
 
 class PortConfigScreen(Screen):
