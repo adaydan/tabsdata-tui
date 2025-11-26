@@ -323,7 +323,7 @@ class NestedMenuApp(App):
             active_screen_class = self.screen.__class__
             active_screen_name = self.screen.name
             self.pop_screen()
-            self.install_screen(active_screen_class(), active_screen_name)
+            # self.install_screen(active_screen_class(), active_screen_name)
 
 
 def run_app():

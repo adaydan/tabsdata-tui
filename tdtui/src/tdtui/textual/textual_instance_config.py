@@ -139,7 +139,9 @@ class PortConfigScreen(Screen):
             instances = instances[0]
             self.external_port = instances["arg_ext"].split(":")[-1]
             self.internal_port = instances["arg_int"].split(":")[-1]
+            self.status = instances["status"]
         else:
+            self.status = "Not Running"
             self.external_port = None
             self.internal_port = None
 
@@ -354,10 +356,9 @@ class PortConfigScreen(Screen):
         app.selected_instance_name = self.selected_instance_name
         app.selected_external_port = self.external_port
         app.selected_internal_port = self.internal_port
-        app.port_selection = {
-            "name": self.selected_instance_name,
-            "external_port": self.external_port,
-            "internal_port": self.internal_port,
-        }
+        app.port_selection["name"] = self.selected_instance_name
+        app.port_selection["external_port"] = self.external_port
+        app.port_selection["internal_port"] = self.internal_port
+        app.port_selection["status"] = self.status
         logging.info(app.port_selection)
         process_response(self)

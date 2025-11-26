@@ -6,7 +6,7 @@ from typing import Awaitable, Callable, List
 
 from textual.app import App, ComposeResult
 from textual.screen import Screen
-from textual.containers import Vertical, Horizontal, VerticalScroll
+from textual.containers import Vertical, Horizontal, VerticalScroll, Container
 from textual.widgets import Label, Footer, Static, Button
 from textual.widgets import RichLog  # ← Correct widget
 
@@ -59,7 +59,8 @@ class SequentialTasksScreenTemplate(Screen):
     .task-row { height: 1; content-align: left middle; }
     .task-spinner { width: 3; }
     .task-label { padding-left: 1; }
-    #task-log { padding: 1 2; border: round $accent; overflow-y: auto; }
+    #task-log { padding: 1 2; border: round $accent; overflow-y: auto; height: 20; width: 80%;}
+    #task-box {align: center top;}
     """
 
     COLOR_PALETTE = [
@@ -92,7 +93,12 @@ class SequentialTasksScreenTemplate(Screen):
                 Label("Running setup tasks...", id="tasks-header"),
                 *self.task_rows,
                 Static(""),
-                RichLog(id="task-log", auto_scroll=False, max_lines=100, markup=True),
+                Container(
+                    RichLog(
+                        id="task-log", auto_scroll=False, max_lines=100, markup=True
+                    ),
+                    id="task-box",
+                ),
                 Static(""),
                 Footer(),
             ),
@@ -106,8 +112,7 @@ class SequentialTasksScreenTemplate(Screen):
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "close-btn":
             active_screen = self.app.screen
-            self.app.pop_screen()
-            self.app.uninstall_screen(active_screen)
+            self.app.push_screen("main")
 
     def log_line(self, task: str | None, msg: str) -> None:
         if task:
@@ -171,7 +176,15 @@ class TaskScreen(SequentialTasksScreenTemplate):
     async def prepare_instance(self, label=None):
         logging.info("a: " + self.app.port_selection["status"])
         logging.info(f"b: {self.app.port_selection}")
+        logging.info(
+            f"c: {[
+            i["name"]
+            for i in find_instances()
+            if i["name"] == self.app.port_selection["name"]
+        ]}"
+        )
         if self.app.port_selection["status"] == "Running":
+            self.log_line(label, "STOP SERVER")
             process = await asyncio.create_subprocess_exec(
                 "tdserver",
                 "stop",
@@ -185,6 +198,7 @@ class TaskScreen(SequentialTasksScreenTemplate):
             for i in find_instances()
             if i["name"] == self.app.port_selection["name"]
         ]:
+            self.log_line(label, "START SERVER")
             process = await asyncio.create_subprocess_exec(
                 "tdserver",
                 "create",
@@ -196,14 +210,14 @@ class TaskScreen(SequentialTasksScreenTemplate):
         else:
             pass
 
-        self.log_line(label, "Running tdserver status…")
-        while True:
-            line = await process.stdout.readline()
-            if not line:
-                break
-            self.log_line(label, line.decode().rstrip("\n"))
-        code = await process.wait()
-        self.log_line(label, f"Exited with code {code}")
+        if "process" in locals():
+            while True:
+                line = await process.stdout.readline()
+                if not line:
+                    break
+                self.log_line(label, line.decode().rstrip("\n"))
+            code = await process.wait()
+            self.log_line(label, f"Exited with code {code}")
 
     async def bind_ports(self, label=None):
         CONFIG_PATH = root = (
